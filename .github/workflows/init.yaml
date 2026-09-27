@@ -29,7 +29,7 @@ jobs:
             const setupIssueTitle = '🚀 プロジェクトの初期セットアップ';
             let setupIssueNumber = '';
             // リポジトリ内の既存Issueをチェック (state: 'all' でオープン・クローズ両方確認)
-            const { data: issues } = await github.rest.issues.listForRepo({
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner,
               repo,
               state: 'all',
