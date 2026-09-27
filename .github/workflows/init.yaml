@@ -56,7 +56,7 @@ jobs:
       - name: 新規ブランチの作成、init.yamlの削除、およびプッシュ
         if: github.ref == 'refs/heads/main'
         env:
-          SETUP_ISSUE_NUMBER: ${{ steps.setup_issue.outputs.result }}
+          SETUP_ISSUE_NUMBER: ${{ fromJSON(steps.setup_issue.outputs.result) }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
