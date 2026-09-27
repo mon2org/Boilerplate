@@ -13,7 +13,7 @@ jobs:
   initialize:
     name: 初期化タスクの実行とPR作成
     runs-on: ubuntu-latest
-    if: github.event.repository.name != 'Boilerplate'
+    if: github.repository != 'mon2org/Boilerplate'
     steps:
       - name: リポジトリのチェックアウト
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
