@@ -40,7 +40,7 @@ jobs:
             if (existingSetupIssue) {
               setupIssueNumber = String(existingSetupIssue.number);
               console.log(`既存の初期セットアップIssue #${setupIssueNumber} を再利用します。`);
-            } else if (issues.length === 0) {
+            } else {
               const { data: createdIssue } = await github.rest.issues.create({
                 owner,
                 repo,
@@ -49,8 +49,6 @@ jobs:
               });
               setupIssueNumber = String(createdIssue.number);
               console.log('Issueを作成しました。');
-            } else {
-              console.log('既存のIssueが見つかったため、Issueの作成をスキップします。');
             }
 
             return setupIssueNumber;
