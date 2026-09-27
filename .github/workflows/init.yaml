@@ -80,7 +80,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
-          SETUP_ISSUE_NUMBER: ${{ steps.setup_issue.outputs.result }}
+          SETUP_ISSUE_NUMBER: ${{ fromJSON(steps.setup_issue.outputs.result) }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -91,6 +91,8 @@ jobs:
             const branchName = `chore/${setupIssueNumber}-init-repository`;
 
             try {
+              console.log('プルリクエスト作成の権限（パーミッション）を確認しています...');
+              
               await github.rest.pulls.create({
                 owner,
                 repo,
@@ -99,7 +101,8 @@ jobs:
                 base: defaultBranch,
                 body: `テンプレートリポジトリから新規作成されたため、初期化タスクの自動作成と、不要になった \`init.yaml\` を削除するプルリクエストです。\n\n内容を確認してマージしてください。${closeIssueText}`
               });
-              console.log(`プルリクエストを作成しました（ブランチ: ${branchName}）。`);
+              
+              console.log(`✅ パーミッションチェックOK！ プルリクエストを作成しました（ブランチ: ${branchName}）。`);
             } catch (error) {
               console.error('プルリクエストの作成に失敗しました:', error.message);
 
