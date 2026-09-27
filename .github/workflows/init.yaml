@@ -63,14 +63,18 @@ jobs:
 
           BRANCH_NAME="chore/${SETUP_ISSUE_NUMBER}-init-repository"
           
-          git checkout -b "$BRANCH_NAME" || git checkout "$BRANCH_NAME"
+          if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH_NAME"; then
+            git checkout -B "$BRANCH_NAME" "origin/$BRANCH_NAME"
+          else
+            git checkout -b "$BRANCH_NAME"
+          fi
 
           # ワークフローファイルを削除してコミット＆プッシュ（コミットメッセージも連動）
           git rm .github/workflows/init.yaml || echo "File already deleted"
           git commit -m "chore: リポジトリ初期化 #${SETUP_ISSUE_NUMBER}" || echo "No changes to commit"
           
-          # 安全にリモートブランチを上書き（リトライ対応）
-          git push origin "$BRANCH_NAME" --force-with-lease
+          # 既存のリモートブランチ履歴を維持したままプッシュ
+          git push origin "$BRANCH_NAME"
 
       - name: プルリクエストの作成
         if: github.ref == 'refs/heads/main'
