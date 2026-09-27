@@ -1,4 +1,4 @@
-name: リポジトリ初期化
+\ame: リポジトリ初期化
 
 on:
   push:
@@ -55,21 +55,24 @@ jobs:
 
             return setupIssueNumber;
 
-      # 追加予定
-
       - name: 新規ブランチの作成、init.yamlの削除、およびプッシュ
         if: github.ref == 'refs/heads/main'
+        env:
+          SETUP_ISSUE_NUMBER: ${{ steps.setup_issue.outputs.result }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          BRANCH_NAME="chore/1-init-repository"
-          git checkout -b "$BRANCH_NAME"
+          BRANCH_NAME="chore/${SETUP_ISSUE_NUMBER}-init-repository"
+          
+          git checkout -b "$BRANCH_NAME" || git checkout "$BRANCH_NAME"
 
-          # ワークフローファイルを削除してコミット＆プッシュ
-          git rm .github/workflows/init.yaml
-          git commit -m "chore: リポジトリ初期化 #1"
-          git push origin "$BRANCH_NAME"
+          # ワークフローファイルを削除してコミット＆プッシュ（コミットメッセージも連動）
+          git rm .github/workflows/init.yaml || echo "File already deleted"
+          git commit -m "chore: リポジトリ初期化 #${SETUP_ISSUE_NUMBER}" || echo "No changes to commit"
+          
+          # 安全にリモートブランチを上書き（リトライ対応）
+          git push origin "$BRANCH_NAME" --force-with-lease
 
       - name: プルリクエストの作成
         if: github.ref == 'refs/heads/main'
@@ -82,13 +85,33 @@ jobs:
             const defaultBranch = context.payload.repository.default_branch || 'main';
             const setupIssueNumber = process.env.SETUP_ISSUE_NUMBER?.trim();
             const closeIssueText = setupIssueNumber ? `\n\nclose #${setupIssueNumber}` : '';
+            
+            const branchName = `chore/${setupIssueNumber}-init-repository`;
 
-            await github.rest.pulls.create({
-              owner,
-              repo,
-              title: '🚀 テンプレート初期化と不要ワークフローの削除',
-              head: 'chore/1-init-repository',
-              base: defaultBranch,
-              body: `テンプレートリポジトリから新規作成されたため、初期化タスクの自動作成と、不要になった \`init.yaml\` を削除するプルリクエストです。\n\n内容を確認してマージしてください。${closeIssueText}`
-            });
-            console.log('プルリクエストを作成しました。');
+            try {
+              await github.rest.pulls.create({
+                owner,
+                repo,
+                title: '🚀 テンプレート初期化と不要ワークフローの削除',
+                head: branchName,
+                base: defaultBranch,
+                body: `テンプレートリポジトリから新規作成されたため、初期化タスクの自動作成と、不要になった \`init.yaml\` を削除するプルリクエストです。\n\n内容を確認してマージしてください。${closeIssueText}`
+              });
+              console.log(`プルリクエストを作成しました（ブランチ: ${branchName}）。`);
+            } catch (error) {
+              console.error('プルリクエストの作成に失敗しました:', error.message);
+
+              if ((error.status === 403 || error.message.includes('not permitted')) && setupIssueNumber) {
+                const commentBody = `⚠️ **【自動通知】初期化ワークフローの実行に失敗しました。**\n\nGitHub Actionsにプルリクエストを作成する権限が与えられていません。\n1. リポジトリの **Settings > Actions > General > Workflow permissions** を開く。\n2. **「Allow GitHub Actions to create and approve pull requests」** のチェックボックスをオンにする。\n3. Actionsタブから該当のワークフローを **Re-run (再実行)** する。`;
+
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: Number(setupIssueNumber),
+                  body: commentBody
+                });
+                console.log(`Issue #${setupIssueNumber} にエラー案内コメントを投稿しました。`);
+              }
+
+              throw error;
+            }
