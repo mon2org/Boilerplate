@@ -21,29 +21,39 @@ jobs:
           fetch-depth: 0
 
       - name: 既存のIssueを確認し、なければ作成する
+        id: setup_issue
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             const { owner, repo } = context.repo;
+            const setupIssueTitle = '🚀 プロジェクトの初期セットアップ';
+            let setupIssueNumber = '';
             // リポジトリ内の既存Issueをチェック (state: 'all' でオープン・クローズ両方確認)
             const { data: issues } = await github.rest.issues.listForRepo({
               owner,
               repo,
               state: 'all',
-              per_page: 1
+              per_page: 100
             });
+            const existingSetupIssue = issues.find((issue) => issue.title === setupIssueTitle);
 
-            if (issues.length === 0) {
-              await github.rest.issues.create({
+            if (existingSetupIssue) {
+              setupIssueNumber = String(existingSetupIssue.number);
+              console.log(`既存の初期セットアップIssue #${setupIssueNumber} を再利用します。`);
+            } else if (issues.length === 0) {
+              const { data: createdIssue } = await github.rest.issues.create({
                 owner,
                 repo,
-                title: '🚀 プロジェクトの初期セットアップ',
+                title: setupIssueTitle,
                 body: 'テンプレートからリポジトリが作成されたため、初期化用タスクを作成しました。\n\n- [ ] タスクの確認\n- [ ] 開発の開始'
               });
+              setupIssueNumber = String(createdIssue.number);
               console.log('Issueを作成しました。');
             } else {
               console.log('既存のIssueが見つかったため、Issueの作成をスキップします。');
             }
+
+            return setupIssueNumber;
 
       # 追加予定
 
@@ -64,10 +74,14 @@ jobs:
       - name: プルリクエストの作成
         if: github.ref == 'refs/heads/main'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          SETUP_ISSUE_NUMBER: ${{ steps.setup_issue.outputs.result }}
         with:
           script: |
             const { owner, repo } = context.repo;
             const defaultBranch = context.payload.repository.default_branch || 'main';
+            const setupIssueNumber = process.env.SETUP_ISSUE_NUMBER?.trim();
+            const closeIssueText = setupIssueNumber ? `\n\nclose #${setupIssueNumber}` : '';
 
             await github.rest.pulls.create({
               owner,
@@ -75,6 +89,6 @@ jobs:
               title: '🚀 テンプレート初期化と不要ワークフローの削除',
               head: 'chore/1-init-repository',
               base: defaultBranch,
-              body: 'テンプレートリポジトリから新規作成されたため、初期化タスクの自動作成と、不要になった `init.yaml` を削除するプルリクエストです。\n\n内容を確認してマージしてください。\n\nclose #1'
+              body: `テンプレートリポジトリから新規作成されたため、初期化タスクの自動作成と、不要になった \`init.yaml\` を削除するプルリクエストです。\n\n内容を確認してマージしてください。${closeIssueText}`
             });
             console.log('プルリクエストを作成しました。');
