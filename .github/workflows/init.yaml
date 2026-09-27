@@ -1,0 +1,80 @@
+name: リポジトリ初期化
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  initialize:
+    name: 初期化タスクの実行とPR作成
+    runs-on: ubuntu-latest
+    if: github.event.repository.name != 'Boilerplate'
+    steps:
+      - name: リポジトリのチェックアウト
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: 既存のIssueを確認し、なければ作成する
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            // リポジトリ内の既存Issueをチェック (state: 'all' でオープン・クローズ両方確認)
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'all',
+              per_page: 1
+            });
+
+            if (issues.length === 0) {
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title: '🚀 プロジェクトの初期セットアップ',
+                body: 'テンプレートからリポジトリが作成されたため、初期化用タスクを作成しました。\n\n- [ ] タスクの確認\n- [ ] 開発の開始'
+              });
+              console.log('Issueを作成しました。');
+            } else {
+              console.log('既存のIssueが見つかったため、Issueの作成をスキップします。');
+            }
+
+      # 追加予定
+
+      - name: 新規ブランチの作成、init.yamlの削除、およびプッシュ
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH_NAME="chore/1-init-repository"
+          git checkout -b "$BRANCH_NAME"
+
+          # ワークフローファイルを削除してコミット＆プッシュ
+          git rm .github/workflows/init.yaml
+          git commit -m "chore: リポジトリ初期化 #1"
+          git push origin "$BRANCH_NAME"
+
+      - name: プルリクエストの作成
+        if: github.ref == 'refs/heads/main'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const defaultBranch = context.payload.repository.default_branch || 'main';
+
+            await github.rest.pulls.create({
+              owner,
+              repo,
+              title: '🚀 テンプレート初期化と不要ワークフローの削除',
+              head: 'chore/1-init-repository',
+              base: defaultBranch,
+              body: 'テンプレートリポジトリから新規作成されたため、初期化タスクの自動作成と、不要になった `init.yaml` を削除するプルリクエストです。\n\n内容を確認してマージしてください。\n\nclose #1'
+            });
+            console.log('プルリクエストを作成しました。');
